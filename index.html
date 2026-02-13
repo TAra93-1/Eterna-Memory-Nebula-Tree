@@ -1,0 +1,2096 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Eterna · Memory Nebula Tree</title>
+
+  <style>
+    :root{
+      --bg0:#040611;
+      --bg1:#070b18;
+      --panel:rgba(10,14,26,0.62);
+      --line:rgba(150,190,255,0.18);
+      --line2:rgba(150,190,255,0.10);
+      --text:#eaf0ff;
+      --muted:#aab7d1;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      overflow:hidden;
+      background:linear-gradient(180deg,var(--bg1),var(--bg0));
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC", "Microsoft YaHei", Arial;
+    }
+    #app{position:fixed; inset:0;}
+    canvas{display:block; width:100%; height:100%;}
+
+    .panel{
+      pointer-events:auto;
+      background:linear-gradient(180deg, rgba(12,16,30,0.68), rgba(8,10,20,0.45));
+      border:1px solid var(--line);
+      border-radius:18px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.48);
+      position:fixed;
+      top:16px;
+      max-height: calc(100vh - 34px);
+      overflow:hidden;
+      will-change: transform;
+      transition: transform 260ms ease;
+      z-index: 10;
+    }
+    .panel .head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px 12px 10px;
+      border-bottom:1px solid rgba(150,190,255,0.08);
+    }
+    .panel .title{
+      font-size:13px;
+      letter-spacing:0.4px;
+      margin:0;
+      line-height:1.4;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .panel .sub{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.65;
+    }
+    .panel .body{
+      padding:12px 12px 12px;
+      overflow:auto;
+      max-height: calc(100vh - 34px - 50px);
+    }
+
+    button, input[type="search"], input[type="range"], input[type="file"]{
+      background:rgba(8,10,20,0.45);
+      color:var(--text);
+      border:1px solid var(--line2);
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:12px;
+      outline:none;
+    }
+    button{cursor:pointer;}
+    button:hover{border-color:rgba(170,210,255,0.26);}
+    input[type="search"]{min-width:220px; width:100%;}
+    input[type="range"]{width:100%;}
+    input[type="file"]{padding:6px 8px;}
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+      align-items:center;
+    }
+    .kv{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+      color:var(--muted);
+      font-size:11px;
+    }
+    .chip{
+      border:1px solid rgba(150,190,255,0.10);
+      border-radius:999px;
+      padding:6px 9px;
+      background:rgba(8,10,18,0.30);
+    }
+    .mini{
+      font-size:11px;
+      color:var(--muted);
+      margin:10px 0 0;
+      line-height:1.7;
+    }
+    .rangeWrap{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      width:100%;
+    }
+    .rangeWrap label{
+      color:var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    #leftPanel{ left:18px; width:min(600px, calc(100vw - 36px)); }
+    #rightPanel{ right:18px; width:min(360px, 42vw); }
+
+    .dockTab{
+      position:fixed;
+      top:16px;
+      width:28px;
+      height:80px;
+      padding:8px 0;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(6,8,16,0.86);
+      color:var(--text);
+      font-size:12px;
+      line-height:1.2;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      writing-mode: vertical-rl;
+      letter-spacing:0.6px;
+      cursor:pointer;
+      backdrop-filter: blur(12px);
+      user-select:none;
+      z-index:11;
+      transition: opacity 200ms ease;
+    }
+    #leftTab{ left:6px; }
+    #rightTab{ right:6px; }
+
+    #leftPanel.collapsed{ transform: translateX(calc(-100% - 20px)); }
+    #rightPanel.collapsed{ transform: translateX(calc(100% + 20px)); }
+    .dockTab.visible{ display:flex; }
+    #leftPanel.collapsed.peek{ transform: translateX(0); }
+    #rightPanel.collapsed.peek{ transform: translateX(0); }
+
+    .hint{
+      margin:0 0 10px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.7;
+    }
+    .listBtn{
+      width:100%;
+      text-align:left;
+      padding:10px 10px;
+      border-radius:14px;
+      margin:0 0 10px;
+      background:rgba(8,10,18,0.28);
+      border:1px solid rgba(150,190,255,0.10);
+    }
+    .listBtn:hover{border-color:rgba(170,210,255,0.24);}
+    .t1{margin:0 0 4px; font-size:12.5px; line-height:1.55;}
+    .t2{margin:0; font-size:11px; color:var(--muted); line-height:1.6;}
+
+    .tip{
+      position:fixed;
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(6,8,16,0.86);
+      color:var(--text);
+      font-size:12px;
+      line-height:1.55;
+      pointer-events:none;
+      opacity:0;
+      transform: translate(-50%, calc(-100% - 12px));
+      transition: opacity 120ms ease;
+      backdrop-filter: blur(12px);
+      max-width:min(520px, 90vw);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      z-index:20;
+    }
+    .tip.show{opacity:1;}
+
+    dialog{
+      width:min(980px, 94vw);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:0;
+      background:linear-gradient(180deg, rgba(14,18,32,0.94), rgba(8,10,18,0.92));
+      color:var(--text);
+      box-shadow: 0 26px 64px rgba(0,0,0,0.60);
+      z-index: 30;
+    }
+    dialog::backdrop{
+      background:rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+    }
+    .mHead{
+      padding:14px 16px;
+      border-bottom:1px solid rgba(150,190,255,0.10);
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .mTitle{margin:0; font-size:15px; line-height:1.55;}
+    .mMeta{margin-top:4px; color:var(--muted); font-size:12px; line-height:1.65;}
+    .mBody{padding:14px 16px; max-height:70vh; overflow:auto;}
+    .sec{margin:0 0 14px;}
+    .sec h3{margin:0 0 6px; font-size:12px; color:#cbd5e1;}
+    .sec pre{
+      margin:0;
+      white-space:pre-wrap;
+      word-break:break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size:12px; line-height:1.75;
+      background:rgba(6,8,14,0.35);
+      border:1px solid rgba(150,190,255,0.10);
+      border-radius:14px;
+      padding:10px;
+      color:#e9efff;
+    }
+    .qList{margin:0; padding-left:18px; line-height:1.75; font-size:13px;}
+    .closeBtn{
+      background:transparent;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:8px 12px;
+      color:var(--text);
+      cursor:pointer;
+    }
+
+    .audioBox{
+      border:1px solid rgba(150,190,255,0.10);
+      border-radius:16px;
+      padding:10px;
+      background:rgba(6,8,16,0.26);
+      margin-top:12px;
+    }
+    .audioTitle{
+      font-size:12px;
+      color:#dbe7ff;
+      margin:0 0 6px;
+    }
+    .audioMeta{
+      font-size:11px;
+      color:var(--muted);
+      margin:6px 0 0;
+      line-height:1.6;
+    }
+    .playlist{
+      max-height:160px;
+      overflow-y:auto;
+      margin-top:8px;
+      border:1px solid rgba(150,190,255,0.08);
+      border-radius:12px;
+    }
+    .plItem{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 8px;
+      font-size:11px;
+      color:var(--muted);
+      cursor:pointer;
+      border-bottom:1px solid rgba(150,190,255,0.06);
+      transition: background 120ms;
+    }
+    .plItem:last-child{ border-bottom:none; }
+    .plItem:hover{ background:rgba(150,190,255,0.06); }
+    .plItem.active{ color:var(--text); background:rgba(80,180,255,0.10); }
+    .plItem .plName{
+      flex:1;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .plItem .plDel{
+      flex-shrink:0;
+      width:20px; height:20px;
+      border-radius:6px;
+      border:1px solid rgba(150,190,255,0.10);
+      background:transparent;
+      color:var(--muted);
+      font-size:12px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+      line-height:1;
+    }
+    .plItem .plDel:hover{ border-color:rgba(255,120,120,0.4); color:#ff8888; }
+    .plEmpty{
+      padding:12px 8px;
+      font-size:11px;
+      color:var(--muted);
+      text-align:center;
+    }
+    #btnPhase{
+      background:linear-gradient(135deg, rgba(80,180,255,0.15), rgba(160,80,255,0.15));
+      border:1px solid rgba(140,190,255,0.25);
+      padding:10px 16px;
+      font-size:12.5px;
+      letter-spacing:0.5px;
+    }
+    #btnPhase:hover{
+      border-color:rgba(170,210,255,0.4);
+      background:linear-gradient(135deg, rgba(80,180,255,0.22), rgba(160,80,255,0.22));
+    }
+
+    @media (max-width: 980px){
+      #rightPanel{ width:min(420px, calc(100vw - 36px)); top:auto; bottom:16px; }
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <button class="dockTab" id="leftTab">控制</button>
+  <aside class="panel" id="leftPanel">
+    <div class="head">
+      <div>
+        <div class="title">Eterna · Memory Nebula Tree</div>
+        <div class="sub">Nebula 星云 + 雪花晶尘 + 音乐联动的呼吸式光感。</div>
+      </div>
+      <button id="toggleLeft">收起</button>
+    </div>
+
+    <div class="body" id="leftBody">
+      <div class="row">
+        <button id="btnFetch">读取同目录 eterna.json</button>
+        <label><input id="file" type="file" accept=".json,application/json" /></label>
+        <button id="btnReset">重置视角</button>
+        <button id="btnBloom">Bloom: ON</button>
+        <button id="btnClearCache">清除缓存</button>
+      </div>
+
+      <div class="row">
+        <input id="q" type="search" placeholder="搜索：标题 / 日期 / 关键词（过滤卡片与列表）" />
+      </div>
+
+      <div class="row">
+        <button id="btnPhase">形态：缄默之书</button>
+      </div>
+      <div class="row" id="dispersionRow" style="display:none;">
+        <div class="rangeWrap">
+          <label>离散程度</label>
+          <input id="dispersion" type="range" min="0" max="100" value="50" />
+          <span id="dispVal" style="color:var(--muted); font-size:12px; width:48px; text-align:right;">50%</span>
+        </div>
+      </div>
+
+      <div class="audioBox">
+        <p class="audioTitle">音乐播放器</p>
+        <div class="row" style="margin-top:6px;">
+          <label><input id="musicFile" type="file" accept="audio/*" multiple /></label>
+          <button id="btnPrev" title="上一曲">⏮</button>
+          <button id="btnPlay">播放</button>
+          <button id="btnNext" title="下一曲">⏭</button>
+          <button id="btnLoopMode">列表循环</button>
+          <button id="btnReactive">Reactive: ON</button>
+        </div>
+        <div class="row">
+          <div class="rangeWrap">
+            <label>音量</label>
+            <input id="vol" type="range" min="0" max="100" value="60" />
+            <span id="volVal" style="color:var(--muted); font-size:12px; width:48px; text-align:right;">60%</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="rangeWrap">
+            <label>联动强度</label>
+            <input id="react" type="range" min="0" max="100" value="45" />
+            <span id="reactVal" style="color:var(--muted); font-size:12px; width:48px; text-align:right;">45%</span>
+          </div>
+        </div>
+        <p class="audioMeta" id="musicMeta">添加音频文件到播放列表，支持多选。曲目会缓存到浏览器中。</p>
+        <div id="playlistWrap">
+          <div class="playlist" id="playlist"><div class="plEmpty">播放列表为空</div></div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <button id="btnClearPlaylist">清空列表</button>
+        </div>
+      </div>
+
+      <p id="status" class="mini">抽屉模式：靠近屏幕左右边缘滑出面板；按住 Shift 可临时展开两侧。</p>
+
+      <div class="kv">
+        <span class="chip" id="cCount">count: -</span>
+        <span class="chip" id="cLoaded">loaded: -</span>
+        <span class="chip" id="cTime">generatedAt: -</span>
+      </div>
+
+      <p class="mini">快捷键：L / R 固定收起或展开；Shift 临时滑出。星云模式下 Shift+滚轮 调节离散程度。</p>
+    </div>
+  </aside>
+
+  <button class="dockTab" id="rightTab">列表</button>
+  <aside class="panel" id="rightPanel">
+    <div class="head">
+      <div class="title">记忆列表</div>
+      <button id="toggleRight">收起</button>
+    </div>
+    <div class="body" id="rightBody">
+      <p class="hint">点击条目会把镜头拉近对应卡片并打开详情。可用左侧搜索框过滤。</p>
+      <div id="list"></div>
+    </div>
+  </aside>
+
+  <div id="tip" class="tip"></div>
+
+  <dialog id="dlg">
+    <div class="mHead">
+      <div>
+        <h2 class="mTitle" id="mTitle">-</h2>
+        <div class="mMeta" id="mMeta">-</div>
+      </div>
+      <button class="closeBtn" id="btnClose">关闭</button>
+    </div>
+    <div class="mBody">
+      <div class="sec">
+        <h3>可引用语录</h3>
+        <ul class="qList" id="mQuotes"></ul>
+      </div>
+      <div class="sec"><h3>Chronos</h3><pre id="mChronos"></pre></div>
+      <div class="sec"><h3>Affect</h3><pre id="mAffect"></pre></div>
+      <div class="sec"><h3>Symbol</h3><pre id="mSymbol"></pre></div>
+      <div class="sec"><h3>Full Text</h3><pre id="mFull"></pre></div>
+    </div>
+  </dialog>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    const app = $("app");
+    const tip = $("tip");
+
+    const leftPanel = $("leftPanel");
+    const rightPanel = $("rightPanel");
+    const toggleLeftBtn = $("toggleLeft");
+    const toggleRightBtn = $("toggleRight");
+    const leftTab = $("leftTab");
+    const rightTab = $("rightTab");
+
+    const statusEl = $("status");
+    const qEl = $("q");
+    const btnPhase = $("btnPhase");
+    const dispersionRow = $("dispersionRow");
+    const dispersionSlider = $("dispersion");
+    const dispVal = $("dispVal");
+    const listEl = $("list");
+    const cCount = $("cCount");
+    const cLoaded = $("cLoaded");
+    const cTime = $("cTime");
+
+    const dlg = $("dlg");
+    const btnClose = $("btnClose");
+
+    const mTitle = $("mTitle");
+    const mMeta = $("mMeta");
+    const mQuotes = $("mQuotes");
+    const mChronos = $("mChronos");
+    const mAffect = $("mAffect");
+    const mSymbol = $("mSymbol");
+    const mFull = $("mFull");
+
+    const btnBloom = $("btnBloom");
+
+    // ===== Audio UI =====
+    const musicFile = $("musicFile");
+    const btnPlay = $("btnPlay");
+    const btnPrev = $("btnPrev");
+    const btnNext = $("btnNext");
+    const btnLoopMode = $("btnLoopMode");
+    const btnReactive = $("btnReactive");
+    const vol = $("vol");
+    const volVal = $("volVal");
+    const react = $("react");
+    const reactVal = $("reactVal");
+    const musicMeta = $("musicMeta");
+    const playlistEl = $("playlist");
+
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
+
+    const LS_LEFT = "eterna_left_collapsed";
+    const LS_RIGHT = "eterna_right_collapsed";
+    const LS_VOL = "eterna_music_vol";
+    const LS_BLOOM = "eterna_bloom_on";
+    const LS_REACTIVE = "eterna_audio_reactive";
+    const LS_REACT_INT = "eterna_audio_react_int";
+    const LS_JSON_DATA = "eterna_json_cache";
+    const LS_LOOP_MODE = "eterna_loop_mode";
+    const LS_PL_INDEX = "eterna_pl_index";
+    const LS_PL_META = "eterna_pl_meta";
+
+    // ===== IndexedDB for audio blob cache =====
+    const IDB_NAME = "eterna_audio_db";
+    const IDB_STORE = "tracks";
+    function openIDB(){
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function idbPut(key, blob){
+      const db = await openIDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(blob, key);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+    async function idbGet(key){
+      const db = await openIDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const req = tx.objectStore(IDB_STORE).get(key);
+        req.onsuccess = () => { db.close(); resolve(req.result); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      });
+    }
+    async function idbDel(key){
+      const db = await openIDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).delete(key);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+    async function idbClear(){
+      const db = await openIDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).clear();
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+
+    function safeText(v){ return v == null ? "" : String(v); }
+
+    function setCollapsed(panel, collapsed, key, persist=true){
+      panel.classList.toggle("collapsed", collapsed);
+      panel.classList.remove("peek");
+      if (persist){
+        try{ localStorage.setItem(key, collapsed ? "1" : "0"); }catch{}
+      }
+      if (panel === leftPanel){
+        toggleLeftBtn.textContent = collapsed ? "展开" : "收起";
+        leftTab.classList.toggle("visible", collapsed);
+      }
+      if (panel === rightPanel){
+        toggleRightBtn.textContent = collapsed ? "展开" : "收起";
+        rightTab.classList.toggle("visible", collapsed);
+      }
+    }
+    function getCollapsed(key, fallback=false){
+      try{
+        const v = localStorage.getItem(key);
+        if (v === "1") return true;
+        if (v === "0") return false;
+      }catch{}
+      return fallback;
+    }
+    function setPeek(panel, on){
+      if (!panel.classList.contains("collapsed")) return;
+      panel.classList.toggle("peek", on);
+    }
+
+    // 默认更干净：两侧收起，靠边自动滑出
+    setCollapsed(leftPanel,  getCollapsed(LS_LEFT,  true), LS_LEFT, false);
+    setCollapsed(rightPanel, getCollapsed(LS_RIGHT, true), LS_RIGHT, false);
+    try{
+      localStorage.setItem(LS_LEFT, leftPanel.classList.contains("collapsed") ? "1" : "0");
+      localStorage.setItem(LS_RIGHT, rightPanel.classList.contains("collapsed") ? "1" : "0");
+    }catch{}
+
+    toggleLeftBtn.addEventListener("click", () => setCollapsed(leftPanel,  !leftPanel.classList.contains("collapsed"), LS_LEFT, true));
+    toggleRightBtn.addEventListener("click", () => setCollapsed(rightPanel, !rightPanel.classList.contains("collapsed"), LS_RIGHT, true));
+    leftTab.addEventListener("click", () => setCollapsed(leftPanel, false, LS_LEFT, true));
+    rightTab.addEventListener("click", () => setCollapsed(rightPanel, false, LS_RIGHT, true));
+
+    let shiftDown = false;
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Shift") shiftDown = true;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "l" || e.key === "L") setCollapsed(leftPanel, !leftPanel.classList.contains("collapsed"), LS_LEFT, true);
+      if (e.key === "r" || e.key === "R") setCollapsed(rightPanel, !rightPanel.classList.contains("collapsed"), LS_RIGHT, true);
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "Shift"){
+        shiftDown = false;
+        setPeek(leftPanel, false);
+        setPeek(rightPanel, false);
+      }
+    });
+
+    const EDGE = 14;
+    function handleAutoDrawer(ev){
+      const x = ev.clientX;
+      const w = window.innerWidth;
+
+      if (dlg.open) return;
+
+      if (leftPanel.classList.contains("collapsed")){
+        const r = leftPanel.getBoundingClientRect();
+        const inside = x <= r.right && x >= r.left && ev.clientY >= r.top && ev.clientY <= r.bottom;
+        const nearEdge = x <= EDGE;
+        setPeek(leftPanel, shiftDown || nearEdge || inside);
+      } else leftPanel.classList.remove("peek");
+
+      if (rightPanel.classList.contains("collapsed")){
+        const r = rightPanel.getBoundingClientRect();
+        const inside = x >= r.left && x <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+        const nearEdge = x >= (w - EDGE);
+        setPeek(rightPanel, shiftDown || nearEdge || inside);
+      } else rightPanel.classList.remove("peek");
+    }
+    window.addEventListener("pointermove", handleAutoDrawer);
+
+    // ===== Tooltip =====
+    function showTip(text, x, y){
+      tip.textContent = text;
+      tip.style.left = x + "px";
+      tip.style.top  = y + "px";
+      tip.classList.add("show");
+    }
+    function hideTip(){ tip.classList.remove("show"); }
+
+    // ===== PRNG =====
+    function hash32(str){
+      let h = 2166136261;
+      for (let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+    function mulberry32(seed){
+      return function(){
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // ===== Three =====
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false, powerPreference:"high-performance" });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(new THREE.Color("#050711"), 1);
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050711, 0.030);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 260);
+    camera.position.set(0, 6.2, 18);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 8;
+    controls.maxDistance = 34;
+    controls.maxPolarAngle = Math.PI * 0.88;
+
+    scene.add(new THREE.AmbientLight(0xbfd6ff, 0.30));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.50);
+    dir.position.set(8, 14, 10);
+    scene.add(dir);
+
+    // Post: Bloom
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.05, 0.45, 0.12);
+    composer.addPass(bloomPass);
+
+    let bloomOn = true;
+    try{
+      const v = localStorage.getItem(LS_BLOOM);
+      if (v === "0") bloomOn = false;
+    }catch{}
+    btnBloom.textContent = bloomOn ? "Bloom: ON" : "Bloom: OFF";
+    btnBloom.addEventListener("click", () => {
+      bloomOn = !bloomOn;
+      btnBloom.textContent = bloomOn ? "Bloom: ON" : "Bloom: OFF";
+      try{ localStorage.setItem(LS_BLOOM, bloomOn ? "1" : "0"); }catch{}
+    });
+
+    // ===== Audio analysis (WebAudio) =====
+    let audioCtx = null;
+    let analyser = null;
+    let freq = null;
+    let srcNode = null;
+    let audioReady = false;
+
+    let reactiveEnabled = true;
+    try{
+      const v = localStorage.getItem(LS_REACTIVE);
+      if (v === "0") reactiveEnabled = false;
+    }catch{}
+    btnReactive.textContent = reactiveEnabled ? "Reactive: ON" : "Reactive: OFF";
+
+    let reactIntensity = 0.45;
+    try{
+      const v = localStorage.getItem(LS_REACT_INT);
+      if (v != null) reactIntensity = Math.max(0, Math.min(1, Number(v)));
+    }catch{}
+    react.value = String(Math.round(reactIntensity*100));
+    reactVal.textContent = react.value + "%";
+
+    btnReactive.addEventListener("click", () => {
+      reactiveEnabled = !reactiveEnabled;
+      btnReactive.textContent = reactiveEnabled ? "Reactive: ON" : "Reactive: OFF";
+      try{ localStorage.setItem(LS_REACTIVE, reactiveEnabled ? "1" : "0"); }catch{}
+    });
+    react.addEventListener("input", () => {
+      reactIntensity = Math.max(0, Math.min(1, Number(react.value)/100));
+      reactVal.textContent = react.value + "%";
+      try{ localStorage.setItem(LS_REACT_INT, String(reactIntensity)); }catch{}
+    });
+
+    function initAudioGraph(){
+      if (audioReady) return;
+      try{
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.86;
+        freq = new Uint8Array(analyser.frequencyBinCount);
+
+        srcNode = audioCtx.createMediaElementSource(audio);
+        srcNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        audioReady = true;
+      }catch(e){
+        audioReady = false;
+      }
+    }
+    async function ensureAudioRunning(){
+      initAudioGraph();
+      if (audioCtx && audioCtx.state === "suspended"){
+        try{ await audioCtx.resume(); }catch{}
+      }
+    }
+
+    // ===== Nebula Sphere (procedural shader) =====
+    const nebulaMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: 0 },
+        uAudio: { value: 0 }
+      },
+      vertexShader: `
+        varying vec3 vPos;
+        void main(){
+          vPos = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vPos;
+        uniform float uTime;
+        uniform float uAudio;
+
+        float hash(vec3 p){
+          p = fract(p * 0.3183099 + vec3(0.1,0.2,0.3));
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+
+        float noise(vec3 p){
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          f = f*f*(3.0-2.0*f);
+
+          float n000 = hash(i + vec3(0,0,0));
+          float n100 = hash(i + vec3(1,0,0));
+          float n010 = hash(i + vec3(0,1,0));
+          float n110 = hash(i + vec3(1,1,0));
+          float n001 = hash(i + vec3(0,0,1));
+          float n101 = hash(i + vec3(1,0,1));
+          float n011 = hash(i + vec3(0,1,1));
+          float n111 = hash(i + vec3(1,1,1));
+
+          float nx00 = mix(n000, n100, f.x);
+          float nx10 = mix(n010, n110, f.x);
+          float nx01 = mix(n001, n101, f.x);
+          float nx11 = mix(n011, n111, f.x);
+
+          float nxy0 = mix(nx00, nx10, f.y);
+          float nxy1 = mix(nx01, nx11, f.y);
+
+          return mix(nxy0, nxy1, f.z);
+        }
+
+        float fbm(vec3 p){
+          float v = 0.0;
+          float a = 0.55;
+          for(int i=0;i<5;i++){
+            v += a * noise(p);
+            p *= 2.02;
+            a *= 0.5;
+          }
+          return v;
+        }
+
+        void main(){
+          vec3 n = normalize(vPos);
+
+          float t = uTime * 0.035;
+          vec3 p = n * 3.0;
+          p += vec3(t, -t*0.7, t*0.45);
+
+          float d1 = fbm(p);
+          float d2 = fbm(p * 1.9 + vec3(4.1,1.7,2.3));
+          float mask = smoothstep(0.40, 0.92, d1*0.75 + d2*0.35);
+
+          vec3 c0 = vec3(0.08, 0.13, 0.28);
+          vec3 c1 = vec3(0.22, 0.42, 0.95);
+          vec3 c2 = vec3(0.40, 0.95, 0.78);
+          vec3 c3 = vec3(0.65, 0.22, 0.95);
+
+          float hue = d1;
+          vec3 col = mix(c0, c1, hue);
+          col = mix(col, c3, smoothstep(0.55, 0.92, d2));
+          col = mix(col, c2, smoothstep(0.68, 0.95, d1));
+
+          float audioBoost = 0.25 + 0.85 * uAudio;
+          float a = mask * 0.26 * audioBoost;
+
+          // 轻微暗角，避免“糊满整屏”
+          float v = 1.0 - smoothstep(0.35, 1.0, abs(n.y));
+          a *= (0.65 + 0.35*v);
+
+          gl_FragColor = vec4(col * (0.55 + 0.55*uAudio), a);
+        }
+      `
+    });
+
+    const nebula = new THREE.Mesh(new THREE.SphereGeometry(150, 64, 64), nebulaMat);
+    nebula.renderOrder = -2;
+    scene.add(nebula);
+
+    // ===== Stars =====
+    const STAR_COUNT = 9000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(STAR_COUNT * 3);
+    const starSeed = new Float32Array(STAR_COUNT);
+    const starCol = new Float32Array(STAR_COUNT * 3);
+
+    const cA = new THREE.Color("#bfe7ff");
+    const cB = new THREE.Color("#9dd6ff");
+    const cC = new THREE.Color("#d6fff1");
+
+    function randOnSphere(){
+      const u = Math.random()*2-1;
+      const t = Math.random()*Math.PI*2;
+      const s = Math.sqrt(1-u*u);
+      return { x:s*Math.cos(t), y:u, z:s*Math.sin(t) };
+    }
+
+    for (let i=0;i<STAR_COUNT;i++){
+      const d = randOnSphere();
+      const r = 70 + Math.pow(Math.random(), 0.45) * 85;
+      starPos[i*3+0] = d.x * r;
+      starPos[i*3+1] = d.y * r;
+      starPos[i*3+2] = d.z * r;
+
+      starSeed[i] = Math.random();
+
+      const m = new THREE.Color().copy(cA);
+      const k = Math.random();
+      if (k < 0.33) m.lerp(cB, Math.random());
+      else if (k < 0.66) m.lerp(cC, Math.random());
+      starCol[i*3+0] = m.r;
+      starCol[i*3+1] = m.g;
+      starCol[i*3+2] = m.b;
+    }
+
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+    starGeo.setAttribute("aSeed", new THREE.BufferAttribute(starSeed, 1));
+    starGeo.setAttribute("color", new THREE.BufferAttribute(starCol, 3));
+
+    const starMat = new THREE.ShaderMaterial({
+      transparent:true,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      vertexColors:true,
+      uniforms:{
+        uTime:{ value:0 },
+        uAudio:{ value:0 },
+        uSize:{ value: 2.2 * renderer.getPixelRatio() }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform float uAudio;
+        uniform float uSize;
+        attribute float aSeed;
+        varying vec3 vColor;
+        varying float vTw;
+        void main(){
+          vColor = color;
+          float tw = 0.55 + 0.45 * sin(uTime*0.9 + aSeed*15.0);
+          vTw = tw;
+
+          vec3 p = position;
+
+          float ang = uTime * 0.02;
+          float cs = cos(ang), sn = sin(ang);
+          p.xz = mat2(cs,-sn,sn,cs) * p.xz;
+
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mv;
+
+          float dist = length(mv.xyz);
+          float pulse = 1.0 + uAudio * 0.55;
+          float size = uSize * (10.0 / dist) * (0.55 + 0.9*tw) * pulse;
+          gl_PointSize = clamp(size, 1.0, 7.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vTw;
+        void main(){
+          vec2 uv = gl_PointCoord.xy - 0.5;
+          float d = dot(uv,uv);
+          float a = smoothstep(0.25, 0.0, d);
+          vec3 col = vColor * (0.7 + 0.7*vTw);
+          gl_FragColor = vec4(col, a);
+        }
+      `
+    });
+
+    const stars = new THREE.Points(starGeo, starMat);
+    stars.renderOrder = -1;
+    scene.add(stars);
+
+    // ===== Snow (GPU-driven falling) =====
+    const SNOW_COUNT = 4200;
+    const SNOW_Y_MIN = -6.6;
+    const SNOW_Y_MAX = 21.5;
+    const SNOW_Y_RANGE = SNOW_Y_MAX - SNOW_Y_MIN;
+    const snowGeo = new THREE.BufferGeometry();
+    const snowPos = new Float32Array(SNOW_COUNT * 3);
+    const snowSeed = new Float32Array(SNOW_COUNT);
+    const snowSpd = new Float32Array(SNOW_COUNT);
+
+    for (let i=0;i<SNOW_COUNT;i++){
+      snowPos[i*3+0] = (Math.random()*2-1) * 26;
+      snowPos[i*3+1] = -6 + Math.random() * 28;
+      snowPos[i*3+2] = (Math.random()*2-1) * 26;
+      snowSeed[i] = Math.random();
+      snowSpd[i] = 0.9 + Math.random() * 1.9;
+    }
+
+    snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPos, 3));
+    snowGeo.setAttribute("aSeed", new THREE.BufferAttribute(snowSeed, 1));
+    snowGeo.setAttribute("aSpd", new THREE.BufferAttribute(snowSpd, 1));
+
+    const snowMat = new THREE.ShaderMaterial({
+      transparent:true,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+      uniforms:{
+        uTime:{ value:0 },
+        uAudio:{ value:0 },
+        uSize:{ value: 3.0 * renderer.getPixelRatio() },
+        uYMin:{ value: SNOW_Y_MIN },
+        uYRange:{ value: SNOW_Y_RANGE }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform float uAudio;
+        uniform float uSize;
+        uniform float uYMin;
+        uniform float uYRange;
+        attribute float aSeed;
+        attribute float aSpd;
+        varying float vA;
+        void main(){
+          vec3 p = position;
+
+          // GPU-driven cyclic falling
+          float fallDist = aSpd * 2.15 * uTime;
+          p.y = uYMin + mod(p.y - uYMin - fallDist, uYRange);
+
+          // lateral drift
+          p.x += sin(uTime*0.55 + aSeed*10.0) * 0.35;
+          p.z += cos(uTime*0.45 + aSeed*12.0) * 0.28;
+
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mv;
+
+          float dist = length(mv.xyz);
+          float tw = 0.55 + 0.45 * sin(uTime*1.25 + aSeed*18.0);
+          vA = tw;
+
+          float pulse = 1.0 + uAudio * 0.35;
+          float size = uSize * (12.0 / dist) * (0.6 + 0.9*tw) * (0.75 + 0.6*(1.0/aSpd)) * pulse;
+          gl_PointSize = clamp(size, 1.0, 11.0);
+        }
+      `,
+      fragmentShader: `
+        varying float vA;
+        void main(){
+          vec2 uv = gl_PointCoord.xy - 0.5;
+          float d = dot(uv,uv);
+          float a = smoothstep(0.22, 0.0, d);
+          vec3 col = vec3(0.82,0.92,1.0) * (0.55 + 0.8*vA);
+          gl_FragColor = vec4(col, a);
+        }
+      `
+    });
+
+    const snow = new THREE.Points(snowGeo, snowMat);
+    snow.renderOrder = 2;
+    scene.add(snow);
+
+    // ===== Tree particles =====
+    const PARTICLE_COUNT = 45000;
+    const treeGeo = new THREE.BufferGeometry();
+
+    const basePos = new Float32Array(PARTICLE_COUNT * 3);
+    const randPos = new Float32Array(PARTICLE_COUNT * 3);
+    const seed    = new Float32Array(PARTICLE_COUNT);
+    const col     = new Float32Array(PARTICLE_COUNT * 3);
+
+    const colorTop = new THREE.Color("#70f2c8");
+    const colorMid = new THREE.Color("#46a7ff");
+    const colorBot = new THREE.Color("#2bd38f");
+
+    for (let i=0;i<PARTICLE_COUNT;i++){
+      const t = i / (PARTICLE_COUNT - 1);
+      const y = -6 + t * 12;
+
+      const level = (y + 6) / 12;
+      const rMax = 0.6 + (1 - level) * 6.2;
+
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.pow(Math.random(), 0.62) * rMax;
+
+      const x = Math.cos(a) * r + (Math.random()-0.5) * 0.18;
+      const z = Math.sin(a) * r + (Math.random()-0.5) * 0.18;
+
+      basePos[i*3+0] = x;
+      basePos[i*3+1] = y;
+      basePos[i*3+2] = z;
+
+      randPos[i*3+0] = (Math.random()*2-1) * 18;
+      randPos[i*3+1] = (Math.random()*2-1) * 14;
+      randPos[i*3+2] = (Math.random()*2-1) * 18;
+
+      seed[i] = Math.random();
+
+      const c = new THREE.Color();
+      if (level > 0.72) c.copy(colorTop).lerp(colorMid, (level-0.72)/0.28);
+      else if (level > 0.35) c.copy(colorBot).lerp(colorTop, (level-0.35)/0.37);
+      else c.copy(colorBot).multiplyScalar(0.85);
+
+      col[i*3+0] = c.r;
+      col[i*3+1] = c.g;
+      col[i*3+2] = c.b;
+    }
+
+    treeGeo.setAttribute("aBase", new THREE.BufferAttribute(basePos, 3));
+    treeGeo.setAttribute("aRand", new THREE.BufferAttribute(randPos, 3));
+    treeGeo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
+    treeGeo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+
+    const treeMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true,
+      uniforms: {
+        uEntropy: { value: 0.0 },
+        uTime:    { value: 0.0 },
+        uAudio:   { value: 0.0 },
+        uSize:    { value: 3.0 * (renderer.getPixelRatio()) }
+      },
+      vertexShader: `
+        uniform float uEntropy;
+        uniform float uTime;
+        uniform float uAudio;
+        uniform float uSize;
+        attribute vec3 aBase;
+        attribute vec3 aRand;
+        attribute float aSeed;
+        varying vec3 vColor;
+        varying float vA;
+        void main(){
+          vec3 pos = mix(aBase, aRand, uEntropy);
+          float breathe = 0.65 + 0.35 * sin(uTime * 1.2 + aSeed * 12.0);
+          float pulse = 1.0 + uAudio * 0.85;
+
+          vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mv;
+
+          float dist = length(mv.xyz);
+          float size = uSize * breathe * (12.0 / dist) * pulse;
+          gl_PointSize = clamp(size, 1.0, 16.0);
+
+          vColor = color;
+          vA = breathe;
+        }
+      `,
+      fragmentShader: `
+        uniform float uAudio;
+        varying vec3 vColor;
+        varying float vA;
+        void main(){
+          vec2 uv = gl_PointCoord.xy - 0.5;
+          float d = dot(uv, uv);
+          float a = smoothstep(0.25, 0.0, d);
+          float glow = (0.9 + 0.65*uAudio) * (0.85 + 0.35*vA);
+          vec3 col = vColor * glow;
+          gl_FragColor = vec4(col, a);
+        }
+      `
+    });
+
+    const treePoints = new THREE.Points(treeGeo, treeMat);
+    treePoints.renderOrder = 1;
+    scene.add(treePoints);
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(10.5, 64),
+      new THREE.MeshBasicMaterial({ color:0x0b1226, transparent:true, opacity:0.45 })
+    );
+    floor.rotation.x = -Math.PI/2;
+    floor.position.y = -6.4;
+    scene.add(floor);
+
+    // ===== Memory cards =====
+    const ornaments = [];
+    const ornGroup = new THREE.Group();
+    scene.add(ornGroup);
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hovered = null;
+
+    function makePolaroidTexture(title, meta){
+      const w = 640, h = 420;
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const g = c.getContext("2d");
+
+      function roundRect(x,y,ww,hh,rr){
+        g.beginPath();
+        g.moveTo(x+rr,y);
+        g.arcTo(x+ww,y,x+ww,y+hh,rr);
+        g.arcTo(x+ww,y+hh,x,y+hh,rr);
+        g.arcTo(x,y+hh,x,y,rr);
+        g.arcTo(x,y,x+ww,y,rr);
+        g.closePath();
+      }
+
+      roundRect(36, 26, w-72, h-52, 26);
+      g.fillStyle = "rgba(240,245,255,0.92)";
+      g.fill();
+
+      roundRect(66, 56, w-132, 210, 22);
+      g.fillStyle = "rgba(10,14,24,0.88)";
+      g.fill();
+
+      const grd = g.createRadialGradient(160, 96, 10, 160, 96, 240);
+      grd.addColorStop(0, "rgba(140,210,255,0.22)");
+      grd.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grd;
+      g.fillRect(66,56,w-132,210);
+
+      g.fillStyle = "rgba(18,24,40,0.92)";
+      g.font = "600 26px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei";
+      const t = title.length > 22 ? (title.slice(0,22) + "…") : title;
+      g.fillText(t, 72, 320);
+
+      g.fillStyle = "rgba(60,70,95,0.92)";
+      g.font = "14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei";
+      const m = meta.length > 46 ? (meta.slice(0,46) + "…") : meta;
+      g.fillText(m, 72, 350);
+
+      g.fillStyle = "rgba(80,210,180,0.35)";
+      g.font = "700 12px ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono";
+      g.fillText("ETERNA · ARCHIVE", w-210, h-58);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      return tex;
+    }
+
+    // ===== Constellation lines =====
+    const linesMat = new THREE.LineBasicMaterial({
+      color: 0x6aafff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const linesGeo = new THREE.BufferGeometry();
+    const constellationLines = new THREE.LineSegments(linesGeo, linesMat);
+    constellationLines.renderOrder = 3;
+    scene.add(constellationLines);
+
+    function updateLinesGeometry(){
+      if (ornaments.length < 2){ linesGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(0), 3)); return; }
+      const arr = [];
+      for (let i = 0; i < ornaments.length - 1; i++){
+        const a = ornaments[i].position, b = ornaments[i+1].position;
+        arr.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+      linesGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(arr), 3));
+    }
+
+    // ===== Phase system =====
+    const PHASES = ["stack", "helix", "nebula"];
+    const PHASE_LABELS = { stack:"缄默之书", helix:"双螺旋年鉴", nebula:"星云扩散" };
+    let currentPhase = "stack";
+    let isTransitioning = false;
+    let nebulaDispersion = 0.5; // 0~1, controls how spread out cards are in nebula
+
+    // Layout generators
+    function getStackLayout(i, n, rnd){
+      return {
+        x: (rnd() - 0.5) * 0.12,
+        y: i * 0.06 - (n * 0.03),
+        z: (rnd() - 0.5) * 0.12,
+        rotZ: (rnd() - 0.5) * 0.15
+      };
+    }
+    function getHelixLayout(i, n){
+      const t = n <= 1 ? 0.5 : i / (n - 1);
+      const angle = t * Math.PI * 8;
+      const radius = 5.5;
+      const height = 24;
+      return {
+        x: Math.cos(angle) * radius,
+        y: (t - 0.5) * height,
+        z: Math.sin(angle) * radius,
+        rotZ: 0
+      };
+    }
+    function getNebulaLayout(i, n, rnd){
+      // 3D volume scatter: use cube root for uniform volume distribution
+      const r = Math.cbrt(rnd()) * 11; // radius 0~11, cbrt avoids hollow center
+      const theta = rnd() * Math.PI * 2;         // longitude
+      const phi = Math.acos(2 * rnd() - 1);      // latitude, uniform on sphere
+      // Squash y axis slightly for a flatter nebula feel
+      return {
+        x: r * Math.sin(phi) * Math.cos(theta) + (rnd() - 0.5) * 1.5,
+        y: r * Math.cos(phi) * 0.7 + (rnd() - 0.5) * 2.0,
+        z: r * Math.sin(phi) * Math.sin(theta) + (rnd() - 0.5) * 1.5,
+        rotZ: (rnd() - 0.5) * 0.3
+      };
+    }
+
+    // Post-process nebula layouts: push apart cards that are too close
+    function relaxNebulaLayouts(items){
+      const minDist = 1.6;
+      const minDist2 = minDist * minDist;
+      for (let pass = 0; pass < 5; pass++){
+        for (let i = 0; i < items.length; i++){
+          const a = items[i].userData.layouts.nebula;
+          for (let j = i + 1; j < items.length; j++){
+            const b = items[j].userData.layouts.nebula;
+            const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+            const d2 = dx*dx + dy*dy + dz*dz;
+            if (d2 < minDist2 && d2 > 0.0001){
+              const d = Math.sqrt(d2);
+              const push = (minDist - d) * 0.55 / d;
+              a.x += dx * push; a.y += dy * push; a.z += dz * push;
+              b.x -= dx * push; b.y -= dy * push; b.z -= dz * push;
+            }
+          }
+        }
+      }
+    }
+
+    function clearOrnaments(){
+      for (const m of ornaments){
+        m.geometry.dispose();
+        if (m.material.map) m.material.map.dispose();
+        m.material.dispose();
+      }
+      ornaments.length = 0;
+      while (ornGroup.children.length) ornGroup.remove(ornGroup.children[0]);
+      linesGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(0), 3));
+    }
+    function hashItem(it, i){
+      return safeText(it.id || it.title || it.filename || ("item_"+i));
+    }
+
+    function createOrnaments(items){
+      clearOrnaments();
+      const n = items.length;
+      if (!n){ currentPhase = "stack"; btnPhase.textContent = "形态：缄默之书"; return; }
+
+      for (let i = 0; i < n; i++){
+        const it = items[i];
+        const key = hashItem(it, i);
+        const rnd = mulberry32(hash32(key));
+
+        // Pre-compute all three layouts
+        const layoutStack  = getStackLayout(i, n, mulberry32(hash32(key + "_s")));
+        const layoutHelix  = getHelixLayout(i, n);
+        const layoutNebula = getNebulaLayout(i, n, mulberry32(hash32(key + "_n")));
+
+        const tex = makePolaroidTexture(
+          safeText(it.title || it.id || "未命名窗口"),
+          `dateRange: ${safeText(it.dateRange || "-")}`
+        );
+
+        const mat = new THREE.MeshStandardMaterial({
+          map: tex,
+          transparent: true,
+          roughness: 0.55,
+          metalness: 0.08,
+          emissive: new THREE.Color(0x0b1226),
+          emissiveIntensity: 0.35
+        });
+
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.1), mat);
+
+        // Start in stack position
+        mesh.position.set(layoutStack.x, layoutStack.y, layoutStack.z);
+        mesh.rotation.z = layoutStack.rotZ;
+
+        mesh.userData.item = it;
+        mesh.userData.layouts = { stack: layoutStack, helix: layoutHelix, nebula: layoutNebula };
+        mesh.userData.spin = (rnd() * 2 - 1) * 0.7;
+        mesh.userData.bob = 0.6 + rnd() * 0.8;
+        mesh.userData.phase = rnd() * Math.PI * 2;
+
+        ornGroup.add(mesh);
+        ornaments.push(mesh);
+      }
+
+      // Relax nebula positions to avoid overlap
+      relaxNebulaLayouts(ornaments);
+
+      currentPhase = "stack";
+      btnPhase.textContent = "形态：缄默之书";
+      updateLinesGeometry();
+
+      // 开场运镜：从远处拉近到堆叠
+      playIntroCamera();
+    }
+
+    // ===== Cinematic intro =====
+    function playIntroCamera(){
+      const startPos = { x: 0, y: 22, z: 35 };
+      const endPos   = { x: 0, y: 3, z: 12 };
+      const startTarget = { x: 0, y: 10, z: 0 };
+      const endTarget   = { x: 0, y: 0.2, z: 0 };
+
+      camera.position.set(startPos.x, startPos.y, startPos.z);
+      controls.target.set(startTarget.x, startTarget.y, startTarget.z);
+
+      const proxy = { cx: startPos.x, cy: startPos.y, cz: startPos.z, tx: startTarget.x, ty: startTarget.y, tz: startTarget.z };
+      gsap.to(proxy, {
+        duration: 2.4,
+        cx: endPos.x, cy: endPos.y, cz: endPos.z,
+        tx: endTarget.x, ty: endTarget.y, tz: endTarget.z,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          camera.position.set(proxy.cx, proxy.cy, proxy.cz);
+          controls.target.set(proxy.tx, proxy.ty, proxy.tz);
+        }
+      });
+    }
+
+    // ===== Phase transition engine =====
+    function transitionTo(phase){
+      if (isTransitioning || !ornaments.length || phase === currentPhase) return;
+      isTransitioning = true;
+      currentPhase = phase;
+      btnPhase.textContent = `形态：${PHASE_LABELS[phase]}`;
+      dispersionRow.style.display = phase === "nebula" ? "" : "none";
+
+      // Animate entropy for tree particles
+      const targetEntropy = phase === "nebula" ? nebulaDispersion * 1.0 : 0;
+      gsap.to(treeMat.uniforms.uEntropy, { value: targetEntropy, duration: 1.5, ease: "power2.inOut" });
+
+      // Constellation lines opacity
+      const targetLineOpacity = phase === "helix" ? 0.25 : 0;
+      gsap.to(linesMat, { opacity: targetLineOpacity, duration: 1.2, ease: "power2.inOut" });
+
+      // Camera move
+      const camTargets = {
+        stack:  { cx: 0, cy: 3, cz: 12, tx: 0, ty: 0.2, tz: 0 },
+        helix:  { cx: 14, cy: 4, cz: 14, tx: 0, ty: 1, tz: 0 },
+        nebula: { cx: 0, cy: 6.2, cz: 18, tx: 0, ty: 0.2, tz: 0 }
+      };
+      const ct = camTargets[phase];
+      const camProxy = { cx: camera.position.x, cy: camera.position.y, cz: camera.position.z,
+                         tx: controls.target.x, ty: controls.target.y, tz: controls.target.z };
+      gsap.to(camProxy, {
+        duration: 1.8, cx: ct.cx, cy: ct.cy, cz: ct.cz, tx: ct.tx, ty: ct.ty, tz: ct.tz,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          camera.position.set(camProxy.cx, camProxy.cy, camProxy.cz);
+          controls.target.set(camProxy.tx, camProxy.ty, camProxy.tz);
+        }
+      });
+
+      // Card transitions with stagger
+      ornaments.forEach((mesh, i) => {
+        const layout = mesh.userData.layouts[phase];
+        let tx = layout.x, ty = layout.y, tz = layout.z;
+        if (phase === "nebula"){
+          const d = nebulaDispersion;
+          tx = layout.x * d;
+          ty = layout.y * d;
+          tz = layout.z * d;
+        }
+        gsap.to(mesh.position, {
+          duration: 1.5,
+          x: tx, y: ty, z: tz,
+          ease: "power3.inOut",
+          delay: i * 0.008,
+          onUpdate: () => { if (phase === "helix") updateLinesGeometry(); }
+        });
+        gsap.to(mesh.rotation, {
+          duration: 1.2,
+          z: layout.rotZ,
+          ease: "back.out(1.4)",
+          delay: i * 0.008
+        });
+      });
+
+      // Mark transition complete
+      gsap.delayedCall(1.5 + ornaments.length * 0.008 + 0.1, () => {
+        isTransitioning = false;
+        updateLinesGeometry();
+      });
+    }
+
+    function cyclePhase(){
+      const idx = (PHASES.indexOf(currentPhase) + 1) % PHASES.length;
+      transitionTo(PHASES[idx]);
+    }
+
+    // ===== Data + filter =====
+    let rawData = null;
+    let viewItems = [];
+
+    function isValidPayload(p){
+      return p && typeof p === "object" && Array.isArray(p.items) && typeof p.count === "number";
+    }
+    function escapeHtml(s){
+      return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function renderList(items){
+      listEl.innerHTML = "";
+      items.forEach((it, idx) => {
+        const b = document.createElement("button");
+        b.className = "listBtn";
+        b.innerHTML = `
+          <p class="t1">${idx+1}. ${escapeHtml(safeText(it.title || it.id || "未命名窗口"))}</p>
+          <p class="t2">dateRange: ${escapeHtml(safeText(it.dateRange || "-"))}</p>
+        `;
+        b.addEventListener("click", () => {
+          focusItem(it);
+          openItem(it);
+        });
+        listEl.appendChild(b);
+      });
+    }
+
+    function applyFilter(){
+      if (!rawData) return;
+      const q = (qEl.value || "").trim().toLowerCase();
+
+      if (!q) viewItems = rawData.items.slice();
+      else {
+        viewItems = rawData.items.filter(it => {
+          const blob = [
+            it.id, it.filename, it.title, it.dateRange,
+            it.chronos, it.affect, it.symbol,
+            (it.quotes || []).join("\n")
+          ].map(v => (v ? String(v).toLowerCase() : "")).join("\n");
+          return blob.includes(q);
+        });
+      }
+
+      cLoaded.textContent = `loaded: ${viewItems.length}`;
+      renderList(viewItems);
+      createOrnaments(viewItems);
+      statusEl.textContent = q ? `已按关键词过滤：${q}` : "已加载数据。背景星云与雪会随时间与音乐轻微呼吸。";
+    }
+
+    function loadPayload(data, fromCache=false){
+      if (!isValidPayload(data)){
+        statusEl.textContent = "JSON 结构不符合预期：需要 generatedAt / count / items[]。";
+        return;
+      }
+
+      rawData = data;
+      cCount.textContent = `count: ${data.count}`;
+      cTime.textContent  = `generatedAt: ${safeText(data.generatedAt || "-")}`;
+      cLoaded.textContent = `loaded: ${data.items.length}`;
+
+      const hint = (data.count !== data.items.length)
+        ? `已加载，但 count=${data.count} 与 items.length=${data.items.length} 不一致；建议修正 count。`
+        : "已加载数据。悬停卡片高亮，点击展开详情。";
+      statusEl.textContent = fromCache ? hint + "（从缓存恢复）" : hint;
+
+      viewItems = data.items.slice();
+      renderList(viewItems);
+      createOrnaments(viewItems);
+      qEl.value = "";
+
+      // 缓存到 localStorage
+      if (!fromCache){
+        try{ localStorage.setItem(LS_JSON_DATA, JSON.stringify(data)); }catch(e){
+          // 数据太大存不下就跳过
+        }
+      }
+    }
+
+    // ===== Dialog =====
+    function openItem(it){
+      mTitle.textContent = safeText(it.title || it.id || "未命名窗口");
+      mMeta.textContent = `dateRange: ${safeText(it.dateRange || "-")} · file: ${safeText(it.filename || "-")} · id: ${safeText(it.id || "-")}`;
+
+      mQuotes.innerHTML = "";
+      (it.quotes || []).slice(0, 40).forEach(q => {
+        const li = document.createElement("li");
+        li.textContent = safeText(q);
+        mQuotes.appendChild(li);
+      });
+
+      mChronos.textContent = safeText(it.chronos || "");
+      mAffect.textContent  = safeText(it.affect || "");
+      mSymbol.textContent  = safeText(it.symbol || "");
+      mFull.textContent    = safeText(it.fullText || "");
+
+      dlg.showModal();
+    }
+    btnClose.addEventListener("click", () => dlg.close());
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) dlg.close();
+    });
+
+    function focusItem(it){
+      const mesh = ornaments.find(o => o.userData.item === it);
+      if (!mesh) return;
+
+      const target = mesh.position.clone();
+      const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+
+      const desiredTarget = target.clone();
+      const desiredCam = target.clone().add(dir.multiplyScalar(10));
+
+      const startTarget = controls.target.clone();
+      const startCam = camera.position.clone();
+      const t0 = performance.now();
+
+      function step(){
+        const t = Math.min(1, (performance.now() - t0) / 420);
+        const k = t*t*(3-2*t);
+        controls.target.lerpVectors(startTarget, desiredTarget, k);
+        camera.position.lerpVectors(startCam, desiredCam, k);
+        if (t < 1) requestAnimationFrame(step);
+      }
+      step();
+    }
+
+    // ===== UI events =====
+    qEl.addEventListener("input", applyFilter);
+
+    $("btnFetch").addEventListener("click", async () => {
+      statusEl.textContent = "正在读取同目录 eterna.json……";
+      try{
+        const res = await fetch("eterna.json", { cache:"no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        loadPayload(data);
+      }catch(err){
+        statusEl.textContent = "读取失败。请用本地服务器打开页面，或改用“选择文件”方式加载。";
+      }
+    });
+
+    $("file").addEventListener("change", async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      statusEl.textContent = "正在读取你选择的 JSON 文件……";
+      try{
+        const txt = await f.text();
+        const data = JSON.parse(txt);
+        loadPayload(data);
+      }catch(err){
+        statusEl.textContent = "解析失败：请确认严格 JSON（无尾随逗号），并且结构包含 items 数组。";
+      }
+    });
+
+    $("btnReset").addEventListener("click", () => {
+      controls.target.set(0, 0.2, 0);
+      camera.position.set(0, 6.2, 18);
+    });
+
+    $("btnClearCache").addEventListener("click", () => {
+      try{ localStorage.removeItem(LS_JSON_DATA); }catch{}
+      rawData = null;
+      viewItems = [];
+      renderList([]);
+      clearOrnaments();
+      cCount.textContent = "count: -";
+      cLoaded.textContent = "loaded: -";
+      cTime.textContent = "generatedAt: -";
+      statusEl.textContent = "已清除缓存数据。可重新导入 JSON。";
+    });
+
+    btnPhase.addEventListener("click", cyclePhase);
+
+    // ===== Dispersion control =====
+    function setDispersion(v){
+      nebulaDispersion = Math.max(0, Math.min(1, v));
+      dispersionSlider.value = Math.round(nebulaDispersion * 100);
+      dispVal.textContent = Math.round(nebulaDispersion * 100) + "%";
+      // Sync tree particle entropy with dispersion
+      if (currentPhase === "nebula"){
+        treeMat.uniforms.uEntropy.value = nebulaDispersion * 1.0;
+      }
+    }
+
+    dispersionSlider.addEventListener("input", () => {
+      setDispersion(Number(dispersionSlider.value) / 100);
+    });
+
+    // Mouse wheel control: Shift+Scroll adjusts dispersion in nebula phase
+    renderer.domElement.addEventListener("wheel", (ev) => {
+      if (currentPhase !== "nebula" || !ev.shiftKey) return;
+      ev.preventDefault();
+      const delta = ev.deltaY > 0 ? -0.03 : 0.03;
+      setDispersion(nebulaDispersion + delta);
+    }, { passive: false });
+
+    // ===== Audio controls (playlist) =====
+    function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+
+    // playlist: [{id, name}]  — id 也是 IDB key
+    let playlist = [];
+    let plIndex = -1;
+    let currentObjURL = null;
+
+    // loopMode: "list" | "single" | "shuffle"
+    const LOOP_MODES = ["list", "single", "shuffle"];
+    const LOOP_LABELS = { list:"列表循环", single:"单曲循环", shuffle:"随机播放" };
+    let loopMode = "list";
+
+    function loadMusicSettings(){
+      let vv = 0.60;
+      try{
+        const sv = localStorage.getItem(LS_VOL);
+        if (sv != null) vv = clamp(Number(sv), 0, 1);
+        const sm = localStorage.getItem(LS_LOOP_MODE);
+        if (sm && LOOP_MODES.includes(sm)) loopMode = sm;
+        const sp = localStorage.getItem(LS_PL_META);
+        if (sp) playlist = JSON.parse(sp);
+        const si = localStorage.getItem(LS_PL_INDEX);
+        if (si != null) plIndex = clamp(parseInt(si,10), -1, playlist.length - 1);
+      }catch{}
+      audio.volume = vv;
+      audio.loop = (loopMode === "single");
+      vol.value = String(Math.round(vv*100));
+      volVal.textContent = vol.value + "%";
+      btnLoopMode.textContent = LOOP_LABELS[loopMode];
+    }
+    loadMusicSettings();
+
+    function savePlMeta(){
+      try{
+        localStorage.setItem(LS_PL_META, JSON.stringify(playlist));
+        localStorage.setItem(LS_PL_INDEX, String(plIndex));
+      }catch{}
+    }
+
+    // ---- Playlist UI ----
+    function renderPlaylist(){
+      playlistEl.innerHTML = "";
+      if (!playlist.length){
+        playlistEl.innerHTML = '<div class="plEmpty">播放列表为空</div>';
+        return;
+      }
+      playlist.forEach((tr, idx) => {
+        const div = document.createElement("div");
+        div.className = "plItem" + (idx === plIndex ? " active" : "");
+        div.innerHTML = `<span class="plName">${idx+1}. ${escapeHtml(tr.name)}</span>`;
+        const del = document.createElement("button");
+        del.className = "plDel";
+        del.textContent = "×";
+        del.title = "从列表移除";
+        del.addEventListener("click", (e) => { e.stopPropagation(); removeTrack(idx); });
+        div.appendChild(del);
+        div.addEventListener("click", () => playTrack(idx));
+        playlistEl.appendChild(div);
+      });
+    }
+
+    async function addFilesToPlaylist(files){
+      for (const f of files){
+        const id = "tr_" + Date.now() + "_" + Math.random().toString(36).slice(2,8);
+        try{
+          const blob = await f.arrayBuffer().then(buf => new Blob([buf], {type: f.type}));
+          await idbPut(id, blob);
+          playlist.push({ id, name: f.name });
+        }catch(e){
+          musicMeta.textContent = `缓存失败：${f.name}`;
+        }
+      }
+      savePlMeta();
+      renderPlaylist();
+      if (playlist.length && plIndex < 0){
+        playTrack(0);
+      } else {
+        musicMeta.textContent = `已添加 ${files.length} 首到播放列表（共 ${playlist.length} 首）`;
+      }
+    }
+
+    async function playTrack(idx){
+      if (idx < 0 || idx >= playlist.length) return;
+      plIndex = idx;
+      savePlMeta();
+      renderPlaylist();
+
+      if (currentObjURL){ try{ URL.revokeObjectURL(currentObjURL); }catch{} currentObjURL = null; }
+
+      const tr = playlist[idx];
+      musicMeta.textContent = `加载中：${tr.name}`;
+      try{
+        const blob = await idbGet(tr.id);
+        if (!blob){ musicMeta.textContent = `缓存丢失：${tr.name}`; return; }
+        currentObjURL = URL.createObjectURL(blob);
+        audio.src = currentObjURL;
+        await ensureAudioRunning();
+        try{ await audio.play(); }catch{
+          setPlayUI();
+          musicMeta.textContent = `正在播放：${tr.name}（若无声请再点播放）`;
+          return;
+        }
+        musicMeta.textContent = `正在播放：${tr.name}`;
+      }catch(e){
+        musicMeta.textContent = `播放失败：${tr.name}`;
+      }
+    }
+
+    async function removeTrack(idx){
+      if (idx < 0 || idx >= playlist.length) return;
+      const tr = playlist[idx];
+      try{ await idbDel(tr.id); }catch{}
+      playlist.splice(idx, 1);
+
+      if (playlist.length === 0){
+        plIndex = -1;
+        audio.pause();
+        audio.removeAttribute("src");
+        if (currentObjURL){ try{ URL.revokeObjectURL(currentObjURL); }catch{} currentObjURL = null; }
+        musicMeta.textContent = "播放列表已清空。";
+      } else if (idx === plIndex){
+        plIndex = Math.min(plIndex, playlist.length - 1);
+        playTrack(plIndex);
+      } else if (idx < plIndex){
+        plIndex--;
+      }
+      savePlMeta();
+      renderPlaylist();
+    }
+
+    function nextTrack(){
+      if (!playlist.length) return;
+      if (loopMode === "shuffle"){
+        let next = Math.floor(Math.random() * playlist.length);
+        if (playlist.length > 1) while (next === plIndex) next = Math.floor(Math.random() * playlist.length);
+        playTrack(next);
+      } else {
+        playTrack((plIndex + 1) % playlist.length);
+      }
+    }
+    function prevTrack(){
+      if (!playlist.length) return;
+      playTrack((plIndex - 1 + playlist.length) % playlist.length);
+    }
+
+    // ---- Controls wiring ----
+    vol.addEventListener("input", () => {
+      const vv = clamp(Number(vol.value)/100, 0, 1);
+      audio.volume = vv;
+      volVal.textContent = Math.round(vv*100) + "%";
+      try{ localStorage.setItem(LS_VOL, String(vv)); }catch{}
+    });
+
+    btnLoopMode.addEventListener("click", () => {
+      const i = (LOOP_MODES.indexOf(loopMode) + 1) % LOOP_MODES.length;
+      loopMode = LOOP_MODES[i];
+      audio.loop = (loopMode === "single");
+      btnLoopMode.textContent = LOOP_LABELS[loopMode];
+      try{ localStorage.setItem(LS_LOOP_MODE, loopMode); }catch{}
+    });
+
+    function setPlayUI(){ btnPlay.textContent = audio.paused ? "▶ 播放" : "⏸ 暂停"; }
+    audio.addEventListener("play", setPlayUI);
+    audio.addEventListener("pause", setPlayUI);
+
+    // 播放结束 → 根据模式决定下一步
+    audio.addEventListener("ended", () => {
+      setPlayUI();
+      if (loopMode === "single") return; // audio.loop 已处理
+      nextTrack();
+    });
+
+    btnPlay.addEventListener("click", async () => {
+      if (!audio.src || !playlist.length){
+        musicMeta.textContent = "播放列表为空，请先添加音乐文件。";
+        return;
+      }
+      await ensureAudioRunning();
+      if (audio.paused){
+        try{ await audio.play(); }catch{
+          musicMeta.textContent = "浏览器阻止了播放，请再点一次。";
+        }
+      } else audio.pause();
+    });
+
+    btnPrev.addEventListener("click", prevTrack);
+    btnNext.addEventListener("click", nextTrack);
+
+    musicFile.addEventListener("change", async (e) => {
+      const files = e.target.files;
+      if (!files || !files.length) return;
+      await addFilesToPlaylist(Array.from(files));
+      musicFile.value = "";
+    });
+
+    $("btnClearPlaylist").addEventListener("click", async () => {
+      audio.pause();
+      audio.removeAttribute("src");
+      if (currentObjURL){ try{ URL.revokeObjectURL(currentObjURL); }catch{} currentObjURL = null; }
+      try{ await idbClear(); }catch{}
+      playlist = [];
+      plIndex = -1;
+      savePlMeta();
+      renderPlaylist();
+      setPlayUI();
+      musicMeta.textContent = "已清空播放列表和缓存。";
+    });
+
+    // 初始渲染播放列表 & 自动恢复上次播放位置
+    renderPlaylist();
+    if (playlist.length && plIndex >= 0 && plIndex < playlist.length){
+      // 只预载不自动播放，用户点播放才会开始
+      (async () => {
+        try{
+          const tr = playlist[plIndex];
+          const blob = await idbGet(tr.id);
+          if (blob){
+            currentObjURL = URL.createObjectURL(blob);
+            audio.src = currentObjURL;
+            musicMeta.textContent = `就绪：${tr.name}（点击播放）`;
+          }
+        }catch{}
+      })();
+    }
+
+    // ===== Pointer interaction =====
+    function setMouseFromEvent(ev){
+      const rect = renderer.domElement.getBoundingClientRect();
+      const x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      mouse.set(x, y);
+    }
+
+    let lastRayTime = 0;
+    let lastPointerEv = null;
+    window.addEventListener("pointermove", (ev) => {
+      lastPointerEv = ev;
+      const now = performance.now();
+      if (now - lastRayTime < 16) return;
+      lastRayTime = now;
+
+      setMouseFromEvent(ev);
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(ornaments, false);
+      if (hits.length){
+        const hit = hits[0].object;
+        if (hovered !== hit){
+          if (hovered) hovered.material.emissiveIntensity = 0.35;
+          hovered = hit;
+          hovered.material.emissiveIntensity = 1.05;
+        }
+        const it = hit.userData.item;
+        showTip(safeText(it.title || it.id || "未命名窗口"), ev.clientX, ev.clientY);
+      } else {
+        if (hovered) hovered.material.emissiveIntensity = 0.35;
+        hovered = null;
+        hideTip();
+      }
+    });
+
+    let pointerDownPos = null;
+    window.addEventListener("pointerdown", (ev) => {
+      pointerDownPos = { x: ev.clientX, y: ev.clientY };
+    });
+    window.addEventListener("pointerup", (ev) => {
+      if (!pointerDownPos) return;
+      const dx = ev.clientX - pointerDownPos.x;
+      const dy = ev.clientY - pointerDownPos.y;
+      pointerDownPos = null;
+      if (dx*dx + dy*dy > 25) return; // 移动超过 5px 视为拖拽
+      setMouseFromEvent(ev);
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(ornaments, false);
+      if (hits.length){
+        const it = hits[0].object.userData.item;
+        openItem(it);
+      }
+    });
+
+    window.addEventListener("mouseleave", hideTip);
+
+    // ===== Animate =====
+    const clock = new THREE.Clock();
+    let audioLevel = 0.0;
+    let rafId = null;
+
+    function sampleAudio(){
+      if (!reactiveEnabled || !audioReady || !analyser || !freq) return 0.0;
+      analyser.getByteFrequencyData(freq);
+
+      // 低频为主（呼吸），一点点中频（细节）
+      let low = 0, mid = 0;
+      const lowStart = 2, lowEnd = 30;
+      const midStart = 31, midEnd = 110;
+
+      for (let i=lowStart;i<=lowEnd;i++) low += freq[i] || 0;
+      for (let i=midStart;i<=midEnd;i++) mid += freq[i] || 0;
+
+      low /= (lowEnd - lowStart + 1);
+      mid /= (midEnd - midStart + 1);
+
+      const e = (low*0.78 + mid*0.22) / 255;
+      return Math.max(0, Math.min(1, e)) * reactIntensity;
+    }
+
+    function animate(){
+      const dt = clock.getDelta();
+      const t = clock.getElapsedTime();
+
+      const targetLevel = sampleAudio();
+      audioLevel = audioLevel * 0.90 + targetLevel * 0.10;
+
+      treeMat.uniforms.uTime.value = t;
+      treeMat.uniforms.uAudio.value = audioLevel;
+
+      starMat.uniforms.uTime.value = t;
+      starMat.uniforms.uAudio.value = audioLevel;
+
+      snowMat.uniforms.uTime.value = t;
+      snowMat.uniforms.uAudio.value = audioLevel;
+
+      nebulaMat.uniforms.uTime.value = t;
+      nebulaMat.uniforms.uAudio.value = audioLevel;
+
+      // 卡片：根据阶段做不同的浮动/朝向
+      for (let i = 0; i < ornaments.length; i++){
+        const m = ornaments[i];
+        const L = m.userData.layouts[currentPhase];
+
+        if (!isTransitioning && L){
+          if (currentPhase === "stack"){
+            const breathe = Math.sin(t * 0.8 + i * 0.3) * 0.03;
+            m.position.y = L.y + breathe;
+          } else if (currentPhase === "helix"){
+            const bob = Math.sin(t * m.userData.bob + m.userData.phase) * 0.12;
+            m.position.y = L.y + bob;
+          } else {
+            // Dispersion: lerp positions between origin and full nebula layout
+            const d = nebulaDispersion;
+            const baseX = L.x * d;
+            const baseY = L.y * d;
+            const baseZ = L.z * d;
+            const bob = Math.sin(t * m.userData.bob + m.userData.phase) * (0.06 + 0.3 * d);
+            const sway = Math.sin(t * 0.55 + m.userData.phase) * (0.02 + 0.12 * d);
+            m.position.x = baseX + sway;
+            m.position.y = baseY + bob;
+            m.position.z = baseZ;
+          }
+        }
+
+        m.lookAt(camera.position);
+        if (currentPhase !== "stack"){
+          const spin = Math.sin(t * 0.55 + m.userData.phase) * m.userData.spin * 0.3;
+          m.rotateZ(spin);
+        }
+
+        m.material.emissiveIntensity = (hovered === m ? 1.05 : 0.35) + audioLevel * 0.55;
+      }
+
+      // 更新星座连线位置（螺旋态时跟随浮动）
+      if (currentPhase === "helix" && linesMat.opacity > 0.01){
+        updateLinesGeometry();
+      }
+
+      // 让整体“像在液体里”
+      treePoints.rotation.y = Math.sin(t * 0.12) * 0.06;
+      stars.rotation.y = Math.sin(t * 0.03) * 0.01;
+      nebula.rotation.y = Math.sin(t * 0.01) * 0.02;
+
+      controls.update();
+      if (bloomOn) composer.render();
+      else renderer.render(scene, camera);
+
+      rafId = requestAnimationFrame(animate);
+    }
+    animate();
+
+    // ===== resize =====
+    window.addEventListener("resize", () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      bloomPass.setSize(w, h);
+    });
+
+    // ===== Init =====
+    setPlayUI();
+
+    // 尝试从 localStorage 恢复上次加载的 JSON 数据
+    try{
+      const cached = localStorage.getItem(LS_JSON_DATA);
+      if (cached){
+        const data = JSON.parse(cached);
+        loadPayload(data, true);
+      } else {
+        statusEl.textContent = "抽屉模式已启用：靠近左右边缘会滑出；星云与粒子会随音乐轻微呼吸。";
+      }
+    }catch{
+      statusEl.textContent = "抽屉模式已启用：靠近左右边缘会滑出；星云与粒子会随音乐轻微呼吸。";
+    }
+  </script>
+</body>
+</html>
