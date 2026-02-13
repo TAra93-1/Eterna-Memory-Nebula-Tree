@@ -1,0 +1,30 @@
+{
+  "name": "Eterna · 记忆星云树",
+  "short_name": "Eterna",
+  "description": "Memory Nebula Tree — 记忆碎片的星云之旅",
+  "start_url": "./%E8%AE%B0%E5%BF%86%E6%98%9F%E4%BA%91%E6%A0%91.html",
+  "display": "standalone",
+  "background_color": "#040611",
+  "theme_color": "#040611",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260213135122_657_54.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "./%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260213135122_657_54.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "./%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260213135122_657_54.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}
